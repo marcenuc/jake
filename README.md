@@ -53,9 +53,9 @@ Or, get the code, and `npm link` in the code root.
 
 A Jakefile is just executable JavaScript. You can include whatever JavaScript you want in it.
 
-### Tasks
+## Tasks
 
-Use `task` or `file` to define tasks. Call it with two arguments (and one optional argument):
+Use `task` to define tasks. Call it with two arguments (and one optional argument):
 
     task(name/prerequisites, action, [async]);
 
@@ -89,14 +89,23 @@ And here's an example of an asynchronous task:
 
 ### File-tasks
 
+Create a file-task by calling `file`.
+
 File-tasks create a file from one or more other files. With a file-task, Jake checks both that the file exists, and also that it is not older than the files specified by any prerequisite tasks. File-tasks are particularly useful for compiling something from a tree of source files.
 
-Create a file task by calling `file`.
-
     desc('This builds a minified JS file for production.');
-    file({'foo-minified.js': ['foo-bar.js', 'foo-baz.js']}, function () {
+    file({'foo-minified.js': ['bar', 'foo-bar.js', 'foo-baz.js']}, function () {
       // Code to concat and minify goes here
     });
+
+### Directory-tasks
+
+Create a directory-task by calling `directory`.
+
+Directory-tasks create a directory for use with for file-tasks. Jake checks for the existence of the directory, and only creates it if needed.
+
+    desc('This creates the bar directory for use with the foo-minified.js file-task.');
+    directory('bar');
 
 ### Namespaces
 
@@ -285,6 +294,56 @@ Setting a value for -T/--tasks will filter the list by that value:
     jake foo:fonebone  # This the foo:fonebone task
 
 The list displayed will be all tasks whose namespace/name contain the filter-string.
+
+### PackageTask
+
+Jake's PackageTask programmically creates a set of tasks for packaging up your project for distribution. Here's an example:
+
+    var PackageTask = require('package_task').PackageTask
+      , t = new PackageTask('fonebone', 'v0.1.2112', function () {
+      var fileList = [
+        'Jakefile'
+      , 'README.md'
+      , 'package.json'
+      , 'lib/*'
+      , 'bin/*'
+      , 'tests/*'
+      ];
+      this.packageFiles.include(fileList);
+      this.needTarGz = true;
+      this.needTarBz2 = true;
+    });
+
+This will automatically create a 'package' task that will assemble the specified files in 'pkg/fonebone-v0.1.2112,' and compress them according to the specified options. After running `jake package`, you'll have the following in pkg/:
+
+    fonebone-v0.1.2112
+    fonebone-v0.1.2112.tar.bz2
+    fonebone-v0.1.2112.tar.gz
+
+PackageTask also creates a 'clobberPackage' task that removes the pkg/ directory, and a 'repackage' task that forces the package to be rebuilt.
+
+PackageTask requires NodeJS's glob module (https://github.com/isaacs/node-glob). It is used in FileList, which is used to specify the list of files to include in your PackageTask (the packageFiles property). (See FileList, below.)
+
+### FileList
+
+Jake's FileList takes a list of glob-patterns and file-names, and lazy-creates a list of files to include. Instead of immediately searching the filesystem to find the files, a FileList holds the pattern until it is actually used.
+
+When any of the normal JavaScript Array methods (or the `toArray` method) are called on the FileList, the pending patterns are resolved into an actual list of file-names. FileList uses NodeJS's glob module (https://github.com/isaacs/node-glob).
+
+To build the list of files, use FileList's `include` and `exclude` methods:
+
+    var FileList = require('file_list').FileList
+      , list = new FileList();
+    list.include('foo/*.txt');
+    list.include(['bar/*.txt', 'README.md']);
+    list.include('Makefile', 'package.json');
+    list.exclude('foo/zoobie.txt');
+    list.exclude(/foo\/src.*.txt/);
+    console.log(list.toArray());
+
+The `include` method can be called either with an array of items, or multiple single parameters. Items can be either glob-patterns, or individual file-names.
+
+The `exclude` method will prevent files from being included in the list. These files must resolve to actual files on the filesystem. It can be called either with an array of items, or mutliple single parameters. Items can be glob-patterns, individual file-names, string-representations of regular-expressions, or regular-expression literals.
 
 ### CoffeeScript Jakefiles
 
